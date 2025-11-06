@@ -35,13 +35,15 @@ class CreditPolicyEnv(gym.Env):
         super(CreditPolicyEnv, self).__init__()
         self.config = default_config.copy()
         self.config.update(config_params or {})
+        self.action_dim = self.config["segments"] + 1
         self.action_space = spaces.Box(
-            low=-0.02, high=0.02, shape=(self.config["segments"] + 1,), dtype=np.float32
+            low=np.array([-0.02] * self.action_dim), high=np.array([0.02] * self.action_dim), shape=(self.action_dim,), dtype=np.float32
         )
         self.observation_dim = 6 + 8
         self.observation_space = spaces.Box(low=np.array([0] * self.observation_dim), high=np.array([1] * self.observation_dim), shape=(self.observation_dim,), dtype=np.float32)
         self.reward_dim = 6
-
+        self.reward_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.reward_dim,), dtype=np.float32)
+        
     def reset(self, *, seed=None, options=None):
         # TODO: Implement reset logic
         pass
