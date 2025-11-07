@@ -2,14 +2,14 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 
-segments = 4
+segments = 1
 default_config = {
     "segments": segments,
     "horizon": 120,
     "period_lag_for_defaults": 6,
-    "poisson_lambda": [2000, 1500, 800, 1200],
-    "score_mu_sigma": [(0.0, 1.0)] * segments,
-    "initial_thresholds": [0.0] * segments,
+    "poisson_lambda": 2000,
+    "score_mu_sigma": (0.0, 1.0),
+    "initial_thresholds": 0.0,
     "ead_mean": [50000] * segments,
     "lgd_mean": [0.45] * segments,
     "apr": [0.28] * segments,
@@ -28,6 +28,7 @@ default_config = {
     "seed": 123,
 }
 
+
 class CreditPolicyEnv(gym.Env):
     metadata = {"render.modes": ["human", "ansi"]}
 
@@ -35,21 +36,46 @@ class CreditPolicyEnv(gym.Env):
         super(CreditPolicyEnv, self).__init__()
         self.config = default_config.copy()
         self.config.update(config_params or {})
-        self.action_dim = self.config["segments"] + 1
+        self.action_dim = 1
         self.action_space = spaces.Box(
-            low=np.array([-0.02] * self.action_dim), high=np.array([0.02] * self.action_dim), shape=(self.action_dim,), dtype=np.float32
+            low=np.array([-0.02] * self.action_dim),
+            high=np.array([0.02] * self.action_dim),
+            shape=(self.action_dim,),
+            dtype=np.float32,
         )
         self.observation_dim = 6 + 8
-        self.observation_space = spaces.Box(low=np.array([0] * self.observation_dim), high=np.array([1] * self.observation_dim), shape=(self.observation_dim,), dtype=np.float32)
+        self.observation_space = spaces.Box(
+            low=np.array([0] * self.observation_dim),
+            high=np.array([1] * self.observation_dim),
+            shape=(self.observation_dim,),
+            dtype=np.float32,
+        )
         self.reward_dim = 6
-        self.reward_space = spaces.Box(low=-1, high=1, shape=(self.reward_dim,), dtype=np.float32)
-        
+        self.reward_space = spaces.Box(
+            low=-1, high=1, shape=(self.reward_dim,), dtype=np.float32
+        )
+
     def reset(self, *, seed=None, options=None):
         self.rng = np.random.default_rng(seed)
-        observation = np.array([self.rng.random() for _ in range(self.observation_dim)], dtype=np.float32)
+        observation = np.array(
+            [self.rng.random() for _ in range(self.observation_dim)], dtype=np.float32
+        )
         info = {}
         return observation, info
 
     def step(self, action):
-        # TODO: Implement step logic
+        applicant_arrivals = self.rng.poisson(self.config["poisson_lambda"])
+        score_dist = self.rng.normal(
+            self.config["score_mu_sigma"][0],
+            self.config["score_mu_sigma"][1],
+            size=applicant_arrivals,
+        )
+        # Apply adjustment from action
+        self.config["initial_thresholds"] += action[0]
+        approvals = (score_dist >= self.config["initial_thresholds"]).sum()
+        # TODO:
+        # Defaults
+        # Losses and Profit
+        # Update inclusion, fairness, and operational metrics
+        # Latent variables evolve via Markov or mean-reverting processes
         pass
