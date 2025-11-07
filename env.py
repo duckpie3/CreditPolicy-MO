@@ -42,11 +42,13 @@ class CreditPolicyEnv(gym.Env):
         self.observation_dim = 6 + 8
         self.observation_space = spaces.Box(low=np.array([0] * self.observation_dim), high=np.array([1] * self.observation_dim), shape=(self.observation_dim,), dtype=np.float32)
         self.reward_dim = 6
-        self.reward_space = spaces.Box(low=-np.inf, high=np.inf, shape=(self.reward_dim,), dtype=np.float32)
+        self.reward_space = spaces.Box(low=-1, high=1, shape=(self.reward_dim,), dtype=np.float32)
         
     def reset(self, *, seed=None, options=None):
-        # TODO: Implement reset logic
-        pass
+        self.rng = np.random.default_rng(seed)
+        observation = np.array([self.rng.random() for _ in range(self.observation_dim)], dtype=np.float32)
+        info = {}
+        return observation, info
 
     def step(self, action):
         # TODO: Implement step logic
