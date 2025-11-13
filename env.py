@@ -10,9 +10,9 @@ default_config = {
     "poisson_lambda": 2000,
     "score_mu_sigma": (0.0, 1.0),
     "initial_thresholds": 0.0,
-    "ead_mean": [50000] * segments,
-    "lgd_mean": [0.45] * segments,
-    "apr": [0.28] * segments,
+    "ead_mean": 50000,
+    "lgd_mean": 0.45,
+    "apr": 0.28,
     "funding_cost": 0.08,
     "inclusion_weights": [1.0, 1.5, 2.0, 1.2],
     "fairness_group_index": 1,
@@ -73,9 +73,13 @@ class CreditPolicyEnv(gym.Env):
         # Apply adjustment from action
         self.config["initial_thresholds"] += action[0]
         approvals = (score_dist >= self.config["initial_thresholds"]).sum()
-        # TODO:
-        # Defaults
-        # Losses and Profit
-        # Update inclusion, fairness, and operational metrics
-        # Latent variables evolve via Markov or mean-reverting processes
+        # TODO: Defaults with lag k
+
+        loss = self.config["lgd_mean"] * self.config["ead_mean"]
+        exposure = approvals * self.config["ead_mean"]
+        income = exposure * self.config["apr"] / 12
+        funding_cost = exposure * self.config["funding_cost"] / 12
+        profit = income - loss - funding_cost
+        # TODO: Update inclusion, fairness, and operational metrics
+        # TODO: Latent variables evolve via Markov or mean-reverting processes
         pass
