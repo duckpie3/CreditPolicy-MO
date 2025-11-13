@@ -7,6 +7,7 @@ default_config = {
     "segments": segments,
     "horizon": 120,
     "period_lag_for_defaults": 6,
+    "base_pd": 0.03,
     "poisson_lambda": 2000,
     "score_mu_sigma": (0.0, 1.0),
     "initial_thresholds": 0.0,
@@ -60,6 +61,7 @@ class CreditPolicyEnv(gym.Env):
         observation = np.array(
             [self.rng.random() for _ in range(self.observation_dim)], dtype=np.float32
         )
+        self.approvals_history = [0] * self.config["period_lag_for_defaults"]
         info = {}
         return observation, info
 
@@ -72,9 +74,12 @@ class CreditPolicyEnv(gym.Env):
         )
         # Apply adjustment from action
         self.config["initial_thresholds"] += action[0]
+        # Calculate approvals
         approvals = (score_dist >= self.config["initial_thresholds"]).sum()
-        # TODO: Defaults with lag k
-
+        self.approvals_history.append(approvals)
+        lagged_approvals = self.approvals_history.pop(0)
+        # Calculate  defaults, loss, profit
+        defaults = self.rng.binomial(lagged_approvals, self.config["base_pd"])
         loss = self.config["lgd_mean"] * self.config["ead_mean"]
         exposure = approvals * self.config["ead_mean"]
         income = exposure * self.config["apr"] / 12
