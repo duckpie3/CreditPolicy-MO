@@ -119,12 +119,10 @@ class CreditPolicyEnv(gym.Env):
         self.t += 1
         truncated = self.t >= self.config["horizon"]
         self.capital += profit
-        if self.capital < self.config["capital_floor"]:
-            truncated = True
+        terminated = False if self.capital >= self.config["capital_floor"] else True
         # Placeholder for next observation
         obs = np.array(
             [self.rng.random() for _ in range(self.observation_dim)], dtype=np.float32
         )
-        # TODO: Latent variables evolve via Markov or mean-reverting processes
         info = {}
-        return obs, reward, False, truncated, info
+        return obs, reward, terminated, truncated, info
