@@ -84,23 +84,32 @@ class CreditPolicyEnv(gym.Env):
         self.threshold += action[0]
         # Calculate approvals per group
         approvals = [(score_dist[group_ids == i] >= self.threshold).sum() for i in range(num_groups)]
+        total_approvals = sum(approvals)
         for i in range(num_groups):
             self.approvals_history[i].append(approvals[i])
         lagged_approvals = [self.approvals_history[i].pop(0) for i in range(num_groups)]
-        # Calculate  defaults, loss, profit
+        # Calculate  defaults
         defaults = [self.rng.binomial(lagged_approvals[i], self.config["base_pd"]) for i in range(num_groups)]
         total_defaults = sum(defaults)
+
         loss = total_defaults * self.config["lgd_mean"] * self.config["ead_mean"]
-        exposure = sum(approvals) * self.config["ead_mean"]
+        exposure = total_approvals * self.config["ead_mean"]
         income = exposure * self.config["apr"] / 12
         funding_cost = exposure * self.config["funding_cost"] / 12
         profit = income - loss - funding_cost
-        # TODO: Update inclusion, fairness, and operational metrics
+        # Update portfolio metrics
+        approval_rate = total_approvals / applicant_arrivals if applicant_arrivals > 0 else 0
+        default_rate = total_defaults / sum(lagged_approvals) if sum(lagged_approvals) > 0 else 0
+        portfolio_metrics = [ approval_rate, default_rate, exposure, loss, profit, applicant_arrivals]
+        # Update incluison and fairness metrics
+        overall_inclusion = total_approvals / applicant_arrivals if applicant_arrivals > 0 else 0
+        segment_inclusion = overall_inclusion  # Single-segment environment
+        
+
         r_profit = np.clip(profit / self.config["profit_target"], -1, 1)
         tail_loss = loss / (self.config["ead_mean"] * self.config["poisson_lambda"])
         r_risk = np.clip(tail_loss / self.config["risk_cap_default_rate"], -1, 1)
-        inclusion_rate = approvals / applicant_arrivals if applicant_arrivals > 0 else 0
-        r_inclusion = np.clip(inclusion_rate / self.config["inclusion_weights"], -1, 1)
+        r_inclusion = np.clip(overall_inclusion / self.config["inclusion_weights"], -1, 1)
         fairness_metric = 0.5  # Placeholder
         r_fairness = np.clip(fairness_metric, -1, 1)
         tv = np.abs(action[0])
