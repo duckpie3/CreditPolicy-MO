@@ -5,6 +5,7 @@ import numpy as np
 segments = 1
 default_config = {
     "segments": segments,
+    "groups": 2,
     "horizon": 120,
     "period_lag_for_defaults": 6,
     "base_pd": 0.03,
@@ -62,7 +63,7 @@ class CreditPolicyEnv(gym.Env):
         obs = np.array(
             [self.rng.random() for _ in range(self.observation_dim)], dtype=np.float32
         )
-        self.approvals_history = [0] * self.config["period_lag_for_defaults"]
+        self.approvals_history = [[0] * self.config["period_lag_for_defaults"] for _ in range(self.config["groups"])]
         self.t = 0
         self.capital = self.config["capital_floor"]
         info = {}
@@ -71,6 +72,8 @@ class CreditPolicyEnv(gym.Env):
     def step(self, action):
         # Simulate applicant arrivals and scores
         applicant_arrivals = self.rng.poisson(self.config["poisson_lambda"])
+        num_groups = self.config["groups"]
+        group_ids = self.rng.integers(0, num_groups, size=applicant_arrivals)
         score_dist = self.rng.normal(
             self.config["score_mu_sigma"][0],
             self.config["score_mu_sigma"][1],
@@ -78,14 +81,16 @@ class CreditPolicyEnv(gym.Env):
         )
         # Apply adjustment from action
         self.config["initial_thresholds"] += action[0]
-        # Calculate approvals
-        approvals = (score_dist >= self.config["initial_thresholds"]).sum()
-        self.approvals_history.append(approvals)
-        lagged_approvals = self.approvals_history.pop(0)
+        # Calculate approvals per group
+        approvals = [(score_dist[group_ids == i] >= self.config["initial_thresholds"]).sum() for i in range(num_groups)]
+        for i in range(num_groups):
+            self.approvals_history[i].append(approvals[i])
+        lagged_approvals = [self.approvals_history[i].pop(0) for i in range(num_groups)]
         # Calculate  defaults, loss, profit
-        defaults = self.rng.binomial(lagged_approvals, self.config["base_pd"])
-        loss = self.config["lgd_mean"] * self.config["ead_mean"]
-        exposure = approvals * self.config["ead_mean"]
+        defaults = [self.rng.binomial(lagged_approvals[i], self.config["base_pd"]) for i in range(num_groups)]
+        total_defaults = sum(defaults)
+        loss = total_defaults * self.config["lgd_mean"] * self.config["ead_mean"]
+        exposure = sum(approvals) * self.config["ead_mean"]
         income = exposure * self.config["apr"] / 12
         funding_cost = exposure * self.config["funding_cost"] / 12
         profit = income - loss - funding_cost
