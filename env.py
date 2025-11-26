@@ -11,7 +11,7 @@ default_config = {
     "base_pd": 0.03,
     "poisson_lambda": 2000,
     "score_mu_sigma": (0.0, 1.0),
-    "initial_thresholds": 0.0,
+    "initial_threshold": 0.0,
     "ead_mean": 50000,
     "lgd_mean": 0.45,
     "apr": 0.28,
@@ -64,6 +64,7 @@ class CreditPolicyEnv(gym.Env):
             [self.rng.random() for _ in range(self.observation_dim)], dtype=np.float32
         )
         self.approvals_history = [[0] * self.config["period_lag_for_defaults"] for _ in range(self.config["groups"])]
+        self.threshold = self.config["initial_thresholds"]
         self.t = 0
         self.capital = self.config["capital_floor"]
         info = {}
@@ -80,9 +81,9 @@ class CreditPolicyEnv(gym.Env):
             size=applicant_arrivals,
         )
         # Apply adjustment from action
-        self.config["initial_thresholds"] += action[0]
+        self.threshold += action[0]
         # Calculate approvals per group
-        approvals = [(score_dist[group_ids == i] >= self.config["initial_thresholds"]).sum() for i in range(num_groups)]
+        approvals = [(score_dist[group_ids == i] >= self.threshold).sum() for i in range(num_groups)]
         for i in range(num_groups):
             self.approvals_history[i].append(approvals[i])
         lagged_approvals = [self.approvals_history[i].pop(0) for i in range(num_groups)]
